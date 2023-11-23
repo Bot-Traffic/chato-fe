@@ -134,6 +134,17 @@
               </p>
             </div>
           </div>
+
+          <!-- 分页组件 -->
+          <el-pagination
+            background
+            class="flex justify-center mt-8"
+            layout="prev, pager, next"
+            v-model:current-page="pagination.page"
+            :page-size="pagination.pageSize"
+            :total="pagination.total"
+            @current-change="handlePageChange"
+          />
         </div>
 
         <!-- Posts -->
@@ -323,6 +334,7 @@ const accountInfo = ref({
   avatar: '',
   title: "点击<a href='https://www.xiaohongshu.com/explore' target='_blank'>登陆</a>小红书账号"
 })
+
 const history = ref([
   {
     name: '',
@@ -360,6 +372,15 @@ const tags = [
 const cards = ref([])
 const refFeedList = ref<HTMLElement | null>(null)
 const isLoadingFeed = ref(false)
+const pagination = ref({
+  total: 0,
+  page: 1,
+  pageSize: 10
+})
+
+function handlePageChange(newPage) {
+  getHistory(newPage, pagination.value.pageSize)
+}
 
 const loadMoreContent = () => {
   if (isLoadingFeed.value) return
@@ -535,12 +556,19 @@ async function getHomeFeed() {
   }
 }
 
-async function getHistory() {
+async function getHistory(page = 1, pageSize = 10) {
   let res = await request({
     url: '/chato/api/v1/xhs/history',
-    method: 'GET'
+    method: 'GET',
+    params: {
+      page: page,
+      pageSize: pageSize
+    }
   })
   history.value = res.data.data.history
+  pagination.value.total = res.data.data.total
+  pagination.value.page = page
+  pagination.value.pageSize = pageSize
 }
 
 async function getRobots() {
