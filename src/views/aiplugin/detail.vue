@@ -99,8 +99,8 @@
         <div v-if="selectedMenu == 'privateMessage'" class="mt-4 flex flex-col h-screen">
           <!-- 小红书专业号链接，居中展示 -->
           <div class="text-cente mb-4r">
-            <h1>
-              仅支持
+            <h1 v-if="!isProLogin">
+              请先登陆，仅支持
               <a
                 href="https://pro.xiaohongshu.com/enterprise/home"
                 target="_blank"
@@ -163,7 +163,9 @@
                         }"
                         style="transition: background-color 0.3s, box-shadow 0.3s"
                       >
-                        {{ record.content }}
+                        <template v-if="record.message_type === 'TEXT'">
+                          {{ record.content }}
+                        </template>
                       </div>
                     </div>
                   </div>
@@ -260,7 +262,7 @@
         </div>
 
         <!-- Posts -->
-        <div v-if="selectedMenu == 'posts'">
+        <div ref="refFeedList" v-if="selectedMenu == 'posts'">
           <div class="flex flex-row justify-between mb-4 mt-4">
             <div class="w-1/2">
               <el-input
@@ -289,7 +291,7 @@
               {{ tag }}
             </p>
           </div>
-          <div ref="refFeedList" class="flex flex-wrap -mx-2 overflow-y-scroll">
+          <div class="flex flex-wrap -mx-2 overflow-y-scroll">
             <div v-for="card in cards" :key="card.id" class="my-2 px-2 w-1/4 overflow-hidden">
               <div class="relative">
                 <img
@@ -527,7 +529,7 @@ const pagination = ref({
   page: 1,
   pageSize: 10
 })
-
+const isProLogin = ref(false)
 const leftChatBoxList: Ref<ChatboxData | null> = ref(null)
 
 const messages: Ref<Message[]> = ref([
@@ -610,22 +612,15 @@ function handlePageChange(newPage) {
 const loadMoreContent = () => {
   if (isLoadingFeed.value) return
   isLoadingFeed.value = true
-
   setTimeout(async () => {
     await getHomeFeed()
     isLoadingFeed.value = false
   }, 2000)
 }
 
-useInfiniteScroll(
-  refFeedList,
-  () => {
-    loadMoreContent()
-  },
-  {
-    distance: 10
-  }
-)
+useInfiniteScroll(refFeedList, () => {
+  loadMoreContent()
+})
 
 function openXHSNote(id) {
   window.open(`https://www.xiaohongshu.com/explore/${id}`, '_blank')
@@ -659,12 +654,12 @@ function toggleSelection(card) {
 }
 
 function selectMenu(typ: string) {
-  selectedMenu.value = typ
   if (typ === 'history') {
     getHistory()
   } else if (typ === 'privateMessage') {
     getPrivateMessageList()
   }
+  selectedMenu.value = typ
 }
 
 async function getPrivateMessageList() {
@@ -676,7 +671,16 @@ async function getPrivateMessageList() {
       query_ts: 0
     }
   })
-  leftChatBoxList.value = res.data.data
+  if (res.data.success) {
+    leftChatBoxList.value = res.data.data
+    isProLogin.value = true
+  } else {
+    leftChatBoxList.value = {
+      next_query_ts: 1,
+      chatbox_list: [],
+      hint_sound_enabled: false
+    }
+  }
 }
 
 function cancleDialog() {
@@ -853,6 +857,18 @@ function formatDate(dateString) {
 
 function proxyImageUrl(originalUrl) {
   return `${currentEnvConfig.baseURL}/chato/api/v1/xhs/image-proxy?url=${originalUrl}`
+}
+
+function parseImageContent(content) {
+  try {
+    return JSON.parse(content)
+  } catch (e) {
+    console.error('Error parsing image content:', e)
+    return {
+      link: '',
+      size: { width: 0, height: 0 }
+    }
+  }
 }
 
 onMounted(() => {
