@@ -6,12 +6,7 @@ import i18n from '@/locales'
 import router from '@/router'
 import { useAuthStore } from '@/stores/auth'
 import { useLocalStorage } from '@vueuse/core'
-import axios, {
-  AxiosError,
-  type AxiosRequestConfig,
-  type AxiosResponse,
-  type InternalAxiosRequestConfig
-} from 'axios'
+import axios, { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import { handleRequestError } from './help'
 let tokenAbnormal = false
 
@@ -42,7 +37,7 @@ service.interceptors.request.use((config: AxiosRequestConfigType) => {
 service.interceptors.response.use(
   (response: AxiosResponse) => {
     const data = response?.data || {}
-    if ('code' in data && Number(data.code) !== 200) {
+    if ('code' in data && Number(data.code) !== 200 && Number(data.code) !== 0) {
       const authStoreI = useAuthStore()
       switch (data.code) {
         case 401: {

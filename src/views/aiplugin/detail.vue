@@ -85,6 +85,118 @@
             >
               评论列表
             </h1>
+            <h1
+              :class="{ 'text-[#7C5CFC]': selectedMenu === 'privateMessage' }"
+              @click="selectMenu('privateMessage')"
+              class="cursor-pointer rounded transition-colors"
+            >
+              私信
+            </h1>
+          </div>
+        </div>
+
+        <!-- Private Message -->
+        <div v-if="selectedMenu == 'privateMessage'" class="mt-4 flex flex-col h-screen">
+          <!-- 小红书专业号链接，居中展示 -->
+          <div class="text-cente mb-4r">
+            <h1>
+              仅支持
+              <a
+                href="https://pro.xiaohongshu.com/enterprise/home"
+                target="_blank"
+                class="text-red-500 hover:underline"
+              >
+                小红书专业号
+              </a>
+            </h1>
+          </div>
+
+          <div class="flex-grow flex overflow-hidden">
+            <!-- 私信列表 -->
+            <div class="w-1/3 bg-gray-50 overflow-y-auto border-r-2 border-gray-300">
+              <!-- 私信列表内容... -->
+              <ul class="list-none p-0 m-0">
+                <li
+                  v-for="message in leftChatBoxList.chatbox_list"
+                  :key="message.user_id"
+                  @click="selectMessage(message)"
+                  class="cursor-pointer p-4 hover:bg-gray-200 transition-colors duration-200 flex justify-between items-center"
+                  :class="{ 'bg-blue-100': selectedChatUser === message }"
+                >
+                  <div class="flex items-center space-x-3">
+                    <img
+                      class="h-10 w-10 rounded-full object-cover"
+                      :src="proxyImageUrl(message.avatar)"
+                      alt="Avatar"
+                    />
+                    <div>
+                      <p class="font-semibold">{{ message.nickname }}</p>
+                      <p class="text-sm text-gray-600 truncate">{{ message.last_msg_content }}</p>
+                    </div>
+                  </div>
+                  <span class="text-xs text-gray-500">{{ formatDate(message.last_msg_ts) }}</span>
+                </li>
+              </ul>
+            </div>
+
+            <!-- 私信对话历史记录 -->
+            <div class="w-2/3 flex flex-col bg-white shadow-lg">
+              <div class="flex-grow overflow-y-auto">
+                <!-- 对话历史记录内容... -->
+                <div v-if="selectedChatUser" class="p-4 bg-white rounded-t-lg">
+                  <h2 class="text-lg font-semibold mb-4">
+                    与 {{ selectedChatUser.nickname }} 的对话
+                  </h2>
+                  <div v-for="record in selectedMsgHistory" :key="record.store_id" class="mb-2">
+                    <div
+                      class="flex items-end mb-1"
+                      :class="{
+                        'justify-end': isCurrentUser(record),
+                        'justify-start': !isCurrentUser(record)
+                      }"
+                    >
+                      <div
+                        class="max-w-xl px-4 py-2 rounded-lg shadow"
+                        :class="{
+                          'bg-blue-500 text-white': isCurrentUser(record),
+                          'bg-gray-100 text-gray-800': !isCurrentUser(record)
+                        }"
+                        style="transition: background-color 0.3s, box-shadow 0.3s"
+                      >
+                        {{ record.content }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="p-4 bg-white rounded-t-lg">
+                  <p class="text-gray-600">选择一个对话以查看消息。</p>
+                </div>
+              </div>
+
+              <!-- 输入区域 -->
+              <div class="border-t p-4">
+                <div class="flex space-x-3">
+                  <input
+                    type="text"
+                    v-model="newMessage"
+                    placeholder="输入消息..."
+                    class="flex-grow p-2 border rounded focus:outline-none focus:ring focus:border-blue-300"
+                  />
+                  <button
+                    @click="enterMessage"
+                    class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                  >
+                    AI回复
+                  </button>
+                  <button
+                    @click="sendMessage"
+                    class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                  >
+                    发送
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -285,10 +397,64 @@ import { currentEnvConfig } from '@/config'
 // import { useDomainStore } from '@/stores/domain'
 import { useInfiniteScroll } from '@vueuse/core'
 import { ElMessageBox } from 'element-plus'
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ContentLayout from '../../layout/ContentLayout.vue'
 import request from '../../utils/request'
+
+interface HistoryEntry {
+  name: string
+  domain_slug: string
+  org_id: string
+  comment: string
+  avatar: string
+  created: string
+  brand_name?: string
+  note_id: string
+  image?: string
+  liked?: boolean
+  liked_count?: number
+  created_avatar?: string
+  created_nickname?: string
+}
+
+interface MessageHistory {
+  id: number
+  text: string
+  isCurrentUser: boolean
+}
+
+interface Message {
+  id: number
+  sender: string
+  preview: string
+  history: MessageHistory[]
+}
+
+interface ChatboxListEntry {
+  last_msg_content: string
+  last_msg_ts: number
+  last_store_id: number
+  view_store_id: number
+  avatar: string
+  nickname: string
+  user_id: string
+  label: string | null
+}
+
+interface ChatboxData {
+  next_query_ts: number
+  chatbox_list: ChatboxListEntry[]
+  hint_sound_enabled: boolean
+}
+
+interface ChatMessage {
+  created_at: number
+  content: string
+  message_type: 'BLANK' | 'TEXT' | 'IMAGE' | 'VIDEO' // 假设消息类型有这些
+  store_id: number
+  receiver_id: string
+}
 
 // const domainStoreI = useDomainStore()
 
@@ -335,23 +501,7 @@ const accountInfo = ref({
   title: "点击<a href='https://www.xiaohongshu.com/explore' target='_blank'>登陆</a>小红书账号"
 })
 
-const history = ref([
-  {
-    name: '',
-    domain_slug: '',
-    org_id: '',
-    comment: '',
-    avatar: '',
-    created: '',
-    brand_name: '',
-    note_id: '',
-    image: '',
-    liked: '',
-    liked_count: '',
-    created_avatar: '',
-    created_nickname: ''
-  }
-])
+const history: Ref<HistoryEntry[]> = ref([])
 
 // const { domainList } = storeToRefs(domainStoreI)
 const tags = [
@@ -378,6 +528,81 @@ const pagination = ref({
   pageSize: 10
 })
 
+const leftChatBoxList: Ref<ChatboxData | null> = ref(null)
+
+const messages: Ref<Message[]> = ref([
+  // 示例数据
+  {
+    id: 1,
+    sender: 'Alice',
+    preview: '你好！',
+    history: [
+      { id: 1, text: '你好！', isCurrentUser: false },
+      { id: 2, text: '你也好！', isCurrentUser: true }
+    ]
+  }
+])
+const selectedChatUser: Ref<ChatboxListEntry | null> = ref(null)
+const selectedMsgHistory: Ref<ChatMessage[]> = ref([])
+const newMessage = ref('')
+
+async function enterMessage() {
+  if (selectedDomainSlug.value == '') {
+    ElMessageBox.alert('请选中使用哪个机器人来回复', 'Oops', {
+      confirmButtonText: 'OK'
+    })
+    return
+  }
+
+  let res = await request({
+    url: `/chato/api-public/domains/${selectedDomainSlug.value}/chat`,
+    method: 'POST',
+    data: {
+      p: selectedChatUser.value.last_msg_content
+    }
+  })
+  newMessage.value = res.data.data.content
+}
+
+async function sendMessage() {
+  if (newMessage.value == '') {
+    ElMessageBox.alert('请输入回复内容', 'Oops', {
+      confirmButtonText: 'OK'
+    })
+    return
+  }
+  await request({
+    url: `/chato/api/v1/xhs/pro_chat_send_msg`,
+    method: 'GET',
+    params: {
+      receiver_id: selectedChatUser.value.user_id,
+      content_type: 'TEXT',
+      content: newMessage.value
+    }
+  })
+  newMessage.value = ''
+  getPrivateMessageList()
+}
+
+function isCurrentUser(record: ChatMessage) {
+  return record.receiver_id === selectedChatUser.value.user_id
+}
+
+async function selectMessage(message: ChatboxListEntry) {
+  selectedChatUser.value = message
+
+  let res = await request({
+    url: '/chato/api/v1/xhs/pro_chat_history',
+    method: 'GET',
+    params: {
+      chat_user_id: message.user_id,
+      store_id: 0,
+      limit: 30
+    }
+  })
+  selectedMsgHistory.value = res.data.data.sort((a, b) => a.store_id - b.store_id)
+}
+
 function handlePageChange(newPage) {
   getHistory(newPage, pagination.value.pageSize)
 }
@@ -387,7 +612,6 @@ const loadMoreContent = () => {
   isLoadingFeed.value = true
 
   setTimeout(async () => {
-    console.log('1212')
     await getHomeFeed()
     isLoadingFeed.value = false
   }, 2000)
@@ -438,7 +662,21 @@ function selectMenu(typ: string) {
   selectedMenu.value = typ
   if (typ === 'history') {
     getHistory()
+  } else if (typ === 'privateMessage') {
+    getPrivateMessageList()
   }
+}
+
+async function getPrivateMessageList() {
+  let res = await request({
+    url: '/chato/api/v1/xhs/pro_msgs',
+    method: 'GET',
+    params: {
+      limit: 10,
+      query_ts: 0
+    }
+  })
+  leftChatBoxList.value = res.data.data
 }
 
 function cancleDialog() {
