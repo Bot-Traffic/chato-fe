@@ -7,7 +7,7 @@
     >
       <div
         data-script="Chato-createBot"
-        class="bg-white rounded-lg min-h-[200px] leading-5 flex flex-col items-center justify-center gap-4 transition cursor-pointer h-full hover:shadow-lg hover:-translate-y-2 lg:p-4 lg:gap-3 lg:h-auto lg:hover:-translate-y-0"
+        class="bg-white rounded-lg min-h-[150px] leading-5 flex flex-col items-center justify-center gap-4 transition cursor-pointer h-full hover:shadow-lg hover:-translate-y-2 lg:p-4 lg:gap-3 lg:h-auto lg:hover:-translate-y-0"
         @click="onNew"
       >
         <div
@@ -18,7 +18,7 @@
           </el-icon>
         </div>
         <p class="font-medium text-sm text-[#7C5CFC]">{{ t('创建机器人') }}</p>
-        <p class="text-[#9DA3AF] text-[13px]">{{ t('快速创建一个属于你的机器人吧！') }}</p>
+        <!-- <p class="text-[#9DA3AF] text-[13px]">{{ t('快速创建一个属于你的机器人吧！') }}</p> -->
       </div>
       <BotListCard
         v-for="item in domainList"
@@ -28,6 +28,7 @@
         @cloneRobot="cloneRobot"
         @sync="onOpenSync"
         @visible="setBotUseScopeDialogVisible"
+        @acceptance="onOpenAcceptanceModal"
       />
     </div>
   </ContentLayout>
@@ -75,6 +76,22 @@
       </div>
     </div>
   </Modal>
+  <Modal
+    :visible="acceptanceVisible"
+    title="生成验收报告"
+    :footerAttrs="{
+      submitText: '生成并发送至飞书',
+      submitting: acceptanceLoading
+    }"
+    @cancel="acceptanceVisible = false"
+    @submit="onAcceptance"
+  >
+    <p class="text-sm text-[#9DA3AF] leading-4">
+      {{
+        t('该功能暂时仅对超人开放，主要服务于训练师的交付报告。请确认该机器人训练已完成后点击。')
+      }}
+    </p>
+  </Modal>
 </template>
 <script lang="ts" setup>
 import {
@@ -83,10 +100,10 @@ import {
   updateBotUseScope,
   updateDomainInResource
 } from '@/api/domain'
+import { generateQACheckReport } from '@/api/file'
 import { deletesDomain } from '@/api/user'
 import Modal from '@/components/Modal/index.vue'
 import Topbar from '@/components/Topbar/index.vue'
-import { useBasicLayout } from '@/composables/useBasicLayout'
 import useSpaceRights from '@/composables/useSpaceRights'
 import { ESpaceRightsType } from '@/enum/space'
 import type { IDomainInfo } from '@/interface/domain'
@@ -116,7 +133,6 @@ const dialogState = reactive({
 })
 const { domainList } = storeToRefs(domainStoreI)
 const { checkRightsTypeNeedUpgrade } = useSpaceRights()
-const { isMobile } = useBasicLayout()
 const visibleOptions = [
   {
     value: 1,
@@ -201,6 +217,26 @@ const onOpenSync = async (bot: IDomainInfo, type: 'visible' | 'template') => {
   dialogState.title = t('设置为{actionType}', { actionType: actionType })
   dialogState.type = type
   dialogState.visible = true
+}
+
+const acceptanceLoading = ref(false)
+const acceptanceVisible = ref(false)
+const acceptanceDomain = ref<IDomainInfo>()
+const onOpenAcceptanceModal = (domain: IDomainInfo) => {
+  acceptanceDomain.value = domain
+  acceptanceVisible.value = true
+}
+
+const onAcceptance = async () => {
+  try {
+    acceptanceLoading.value = true
+    await generateQACheckReport(acceptanceDomain.value.id)
+    ElNotification.success(t('生成成功'))
+    acceptanceVisible.value = false
+  } catch (e) {
+  } finally {
+    acceptanceLoading.value = false
+  }
 }
 
 const syncSubmiting = ref(false)

@@ -15,12 +15,61 @@
           {{ internalBot.name }}
         </span>
       </div>
-      <div
+      <!-- <div
         v-if="isAllowedDelete"
         class="border hidden border-[#E4E7ED] lg:!hidden p-2 group-hover/card:block border-solid rounded hover:!border-[#7C5CFC] text-[#9DA3AF] hover:text-[#7C5CFC]"
         @click.stop="emit('visible', internalBot)"
       >
         <svg-icon :name="internalBot.use_scope ? 'visible' : 'private'" svg-class="w-4 h-4" />
+      </div> -->
+      <div class="gap-4 flex items-center justify-between">
+        <el-popover trigger="click" placement="right-start" width="fit-content" :show-arrow="false">
+          <template #reference>
+            <svg-icon
+              name="more"
+              svg-class="w-4 h-4 transition-colors text-[#9DA3AF] hover:text-[#7C5CFC]"
+              @click.stop
+            />
+          </template>
+          <div class="flex flex-col gap-4">
+            <IconBtn
+              class="w-full"
+              name="clone-robot"
+              @click="() => emit('cloneRobot', internalBot.slug, internalBot.name)"
+            >
+              {{ t('克隆') }}
+            </IconBtn>
+            <IconBtn
+              class="w-full"
+              :name="internalBot.use_scope ? 'visible' : 'private'"
+              @click="() => emit('visible', internalBot)"
+            >
+              {{ t('访问权限') }}({{ internalBot.use_scope ? t('公开') : t('私密') }})
+            </IconBtn>
+            <template v-if="isPrivilege">
+              <IconBtn
+                :icon="internalBot.visible ? Hide : View"
+                @click="() => emit('sync', internalBot, 'visible')"
+              >
+                {{ internalBot.visible ? t('设为不可见') : t('设为可见') }}
+              </IconBtn>
+              <IconBtn
+                :icon="internalBot.template ? Notification : Compass"
+                @click="() => emit('sync', internalBot, 'template')"
+              >
+                {{ internalBot.template ? t('设为资源广场机器人') : t('设为模板机器人') }}
+              </IconBtn>
+            </template>
+            <IconBtn
+              v-if="isAllowedDelete"
+              :icon="Delete"
+              @click="() => emit('delete', internalBot)"
+              class="hover:!text-[#f56c6c]"
+            >
+              {{ t('删除') }}
+            </IconBtn>
+          </div>
+        </el-popover>
       </div>
     </div>
 
@@ -30,7 +79,7 @@
       {{ internalBot.desc }}
     </p>
 
-    <div class="flex items-center justify-between">
+    <!-- <div class="flex items-center justify-between">
       <template v-if="EDomainStatus.draft === internalBot.status">
         <IconBtn
           v-if="isAllowedDelete"
@@ -51,8 +100,8 @@
           {{ t('继续创建') }}
         </el-button>
       </template>
-      <template v-else>
-        <div class="gap-4 flex items-center justify-between">
+      <template v-else> -->
+    <!-- <div class="gap-4 flex items-center justify-between">
           <IconBtn :icon="Edit" @click="() => onLinkTo(RoutesMap.tranning.roleInfo)">
             {{ t('编辑') }}
           </IconBtn>
@@ -79,6 +128,13 @@
                 @click="() => emit('cloneRobot', internalBot.slug, internalBot.name)"
               >
                 {{ t('克隆') }}
+              </IconBtn>
+              <IconBtn
+                v-if="isSuperAdmin"
+                :icon="Finished"
+                @click="() => emit('acceptance', internalBot)"
+              >
+                {{ t('验收') }}
               </IconBtn>
               <template v-if="isPrivilege">
                 <IconBtn
@@ -113,9 +169,9 @@
           class="shrink-0 !border-[#E4E7ED] !text-[#3D3D3D] !font-normal !bg-transparent hover:!bg-[#7C5CFC] hover:!border-[#7C5CFC] hover:!text-white"
         >
           {{ t('对话') }}
-        </el-button>
-      </template>
-    </div>
+        </el-button> -->
+    <!-- </template>
+    </div> -->
 
     <span
       v-if="EDomainStatus.draft === internalBot.status"
@@ -131,21 +187,13 @@ import DefaultAvatar from '@/assets/img/avatar.png'
 import IconBtn from '@/components/IconBtn/index.vue'
 import { useBasicLayout } from '@/composables/useBasicLayout'
 import { EDomainStatus } from '@/enum/domain'
+import { EAllRole } from '@/enum/user'
 import type { IDomainInfo } from '@/interface/domain'
 import { RoutesMap } from '@/router'
 import { useBase } from '@/stores/base'
 import { useChatStore } from '@/stores/chat'
 import { useDomainStore } from '@/stores/domain'
-import {
-  ChatDotRound,
-  Compass,
-  Delete,
-  Edit,
-  Hide,
-  Notification,
-  Position,
-  View
-} from '@element-plus/icons-vue'
+import { Compass, Delete, Hide, Notification, View } from '@element-plus/icons-vue'
 import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -155,7 +203,7 @@ const props = defineProps<{
   bot?: IDomainInfo
 }>()
 
-const emit = defineEmits(['delete', 'sync', 'cloneRobot', 'visible'])
+const emit = defineEmits(['delete', 'sync', 'cloneRobot', 'visible', 'acceptance'])
 
 // 特殊权益用户开放同步/隐藏资源广场机器人按钮
 const PrivilegeUser = '18116404787'
@@ -170,6 +218,7 @@ const { isMobile } = useBasicLayout()
 
 const internalBot = computed(() => props.bot)
 const isPrivilege = computed(() => userInfo.value.mobile === PrivilegeUser)
+const isSuperAdmin = computed(() => userInfo.value.role === EAllRole.superman)
 const isAllowedDelete = computed(
   () =>
     userInfo.value.id === userInfo.value.org.owner_id ||
