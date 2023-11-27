@@ -573,7 +573,7 @@ async function sendMessage() {
     })
     return
   }
-  await request({
+  const res = await request({
     url: `/chato/api/v1/xhs/pro_chat_send_msg`,
     method: 'GET',
     params: {
@@ -582,6 +582,12 @@ async function sendMessage() {
       content: newMessage.value
     }
   })
+  if (!res.data.success) {
+    ElMessageBox.alert('请使用专业号', 'Oops', {
+      confirmButtonText: 'OK'
+    })
+    return
+  }
   newMessage.value = ''
   getPrivateMessageList()
 }
