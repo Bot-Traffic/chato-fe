@@ -589,7 +589,7 @@ async function sendMessage() {
     return
   }
   newMessage.value = ''
-  getPrivateMessageList()
+  selectMessage(selectedChatUser.value)
 }
 
 function isCurrentUser(record: ChatMessage) {
